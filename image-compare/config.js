@@ -1,10 +1,10 @@
-// Replace the demo paths with your files, e.g. "images/before.webp".
-// Use exactly TWO or THREE entries. All images should have identical dimensions.
+// Aquarium render order: Cool, Golden (Aq2), Night.
+// All three share a 16:7 aspect ratio; originals are preserved.
 window.COMPARISON = {
-  aspectRatio: "16 / 9",
+  aspectRatio: "16 / 7",
   images: [
-    { src: "images/demo-neutral.svg", label: "Original", alt: "Illustrative mountain landscape, neutral colors" },
-    { src: "images/demo-warm.svg", label: "Warm grade", alt: "The same landscape, warm colors" },
-    { src: "images/demo-cool.svg", label: "Cool grade", alt: "The same landscape, cool colors" }
+    { src: "images/aquarium-cool.webp", label: "Cool", alt: "Aquarium hall with cool blue lighting" },
+    { src: "images/aquarium-golden.webp", label: "Golden", alt: "Aquarium hall with warm golden sunlight" },
+    { src: "images/aquarium-night.webp", label: "Night", alt: "Aquarium hall with magenta night lighting" }
   ]
 };
