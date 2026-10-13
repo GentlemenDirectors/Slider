@@ -1,0 +1,112 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LightSwitch lighting comparisons</title><style>:root{color-scheme:dark;font-family:Arial,Helvetica,sans-serif;color:#f5f4ef;background:#101110;font-synthesis:none}*{box-sizing:border-box}body{margin:0}main{max-width:1160px;margin:auto;padding:54px 36px 28px}header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:36px;gap:32px}.eyebrow{font:11px monospace;letter-spacing:2px;color:#c6eb86;margin:0 0 22px}h1{font-size:clamp(36px,5vw,66px);letter-spacing:-3px;line-height:1.02;margin:0;font-weight:500}.intro{color:#b0b3a9;line-height:1.7;font-size:15px;margin:0 0 5px}.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}button{font:13px Arial;color:#c7cbc1;background:transparent;border:0;border-radius:6px;padding:10px 14px;cursor:pointer}button:disabled{opacity:.35;cursor:default}.segmented{padding:4px;border:1px solid #363a32;border-radius:9px}.segmented button[aria-pressed=true]{background:#c6eb86;color:#15200b}button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #c6eb86;outline-offset:4px}image-compare{display:block;position:relative;isolation:isolate;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:16px;background:#252a28;touch-action:pan-y;user-select:none;cursor:ew-resize}image-compare .layer{position:absolute;inset:0;background:#252a28}image-compare img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none}.divider{position:absolute;top:0;bottom:0;width:2px;background:#fff;transform:translateX(-50%);outline:none;z-index:4;touch-action:pan-y}.divider:before{content:'';position:absolute;inset:0 -15px}.grip{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:grid;place-content:center;border-radius:50%;width:44px;height:44px;color:#171b18;background:#fff;font-size:26px;letter-spacing:1px;box-shadow:0 3px 20px #0003}.divider:focus-visible .grip{outline:3px solid #c6eb86;outline-offset:4px}.image-label{position:absolute;bottom:18px;transform:translateX(-50%);font:10px monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:9px 12px;border:1px solid #ffffff30;border-radius:5px;background:#151b19dc;color:white;pointer-events:none;z-index:3}.image-error{position:absolute;inset:25% 20%;color:white;font-size:14px;line-height:1.5}.caption{display:flex;justify-content:space-between;gap:15px;font:11px monospace;color:#969c90;margin:17px 0 32px}.setup{border-block:1px solid #33372f;padding:20px 0}.setup summary{cursor:pointer;list-style:none;font-size:14px}.setup summary span{float:right;color:#c6eb86}.setup p{color:#a6ada0;font-size:13px;line-height:1.6;max-width:760px}#uploads{display:flex;gap:14px}.upload{flex:1;min-width:0;padding:15px;background:#1c201b;border-radius:8px;font-size:12px}.upload[hidden]{display:none}input{display:block;max-width:100%;font-size:11px;margin-top:14px}footer{display:flex;justify-content:space-between;margin-top:25px;font:10px monospace;letter-spacing:1px;color:#899180}a{color:#c6eb86;text-decoration:none}.embed{background:transparent;min-height:100dvh;display:grid;align-items:center}.embed image-compare{max-height:100dvh;border-radius:12px}@media(max-width:600px){main{padding:30px 16px}header{display:block;margin-bottom:24px}h1{letter-spacing:-1.5px}.intro{margin-top:18px;font-size:13px}.caption{font-size:9px}.caption span:last-child{display:none}.image-label{font-size:8px;padding:6px;bottom:10px;letter-spacing:0}.grip{width:36px;height:36px}#uploads{flex-direction:column}image-compare{border-radius:10px}button{padding:9px 11px;font-size:12px}}
+</style></head><body><script>class ImageCompare extends HTMLElement {
+  configure(config) {
+    this.controller?.abort();
+    this.resizeObserver?.disconnect();
+    this.controller = new AbortController();
+    const signal = this.controller.signal;
+    if (!config || !Array.isArray(config.images) || ![2, 3].includes(config.images.length)) {
+      this.textContent = 'Set two or three images in config.js.';
+      return;
+    }
+    this.replaceChildren();
+    this.images = config.images;
+    this.angle = Math.max(-30, Math.min(30, Number(config.dividerAngle) || 0));
+    this.style.aspectRatio = config.aspectRatio || '16 / 9';
+    this.setAttribute('role', 'group');
+    this.setAttribute('aria-label', 'Interactive image comparison');
+    this.points = this.images.length === 3 ? [33.33, 66.67] : [50];
+    this.layers = this.images.map((item) => {
+      const layer = document.createElement('div'); layer.className = 'layer';
+      const img = document.createElement('img');
+      img.alt = item.alt || item.label; img.draggable = false;
+      img.addEventListener('error', () => { const error = document.createElement('span'); error.className = 'image-error'; error.textContent = `Could not load ${item.label}. Check the image path in config.js.`; layer.append(error); }, {signal});
+      img.src = item.src; layer.append(img); this.append(layer); return layer;
+    });
+    this.labels = this.images.map(item => {
+      const label = document.createElement('span'); label.className = 'image-label'; label.textContent = item.label; this.append(label); return label;
+    });
+    this.handles = this.points.map((_, index) => {
+      const handle = document.createElement('div'); handle.className = 'divider'; handle.tabIndex = 0;
+      handle.setAttribute('role', 'slider'); handle.setAttribute('aria-orientation', 'horizontal');
+      handle.setAttribute('aria-label', `${this.images[index].label} / ${this.images[index+1].label} divider`);
+      const grip = document.createElement('span'); grip.className = 'grip'; grip.textContent = '‹ ›'; grip.setAttribute('aria-hidden','true'); handle.append(grip);
+      handle.addEventListener('keydown', e => {
+        const step = e.shiftKey ? 10 : 1;
+        const [min,max] = this.bounds(index);
+        const values = {ArrowLeft: this.points[index]-step, ArrowRight: this.points[index]+step, ArrowDown: this.points[index]-step, ArrowUp: this.points[index]+step, Home:min, End:max};
+        if (e.key in values) { e.preventDefault(); this.move(index,values[e.key]); }
+      }, {signal});
+      this.append(handle); return handle;
+    });
+    let active = null, startX = 0, startPoint = 0;
+    const movePointer = e => {const box = this.getBoundingClientRect(); this.move(active, startPoint + (e.clientX-startX)/box.width*100);};
+    this.addEventListener('pointerdown', e => {
+      if (!e.isPrimary || e.button !== 0) return;
+      const box = this.getBoundingClientRect(); const x = (e.clientX-box.left)/box.width*100;
+      const hit = this.handles.findIndex(h => h.contains(e.target));
+      const y = (e.clientY-box.top)/box.height;
+      const distances = this.points.map((p,i) => Math.abs(p + this.offset(i)*(1-2*y)-x));
+      active = hit >= 0 ? hit : distances.indexOf(Math.min(...distances));
+      if (hit < 0) this.move(active,x-this.offset(active)*(1-2*y));
+      startX=e.clientX; startPoint=this.points[active];
+      this.setPointerCapture(e.pointerId); this.handles[active].focus({preventScroll:true});
+    }, {signal});
+    this.addEventListener('pointermove', e => { if (active !== null && this.hasPointerCapture(e.pointerId)) movePointer(e); }, {signal});
+    ['pointerup','pointercancel','lostpointercapture'].forEach(type => this.addEventListener(type, () => {active=null;}, {signal}));
+    this.resizeObserver = new ResizeObserver(() => this.paint());
+    this.resizeObserver.observe(this);
+    this.paint();
+  }
+  bounds(index) { return [index===0 ? 0 : this.points[index-1]+6, index===this.points.length-1 ? 100 : this.points[index+1]-6]; }
+  offset(index) {
+    const box=this.getBoundingClientRect();
+    const amount=box.width ? Math.tan(this.angle*Math.PI/180)*box.height/box.width*50 : 0;
+    // Ease the slant to vertical at the edges, allowing a complete reveal.
+    return Math.sign(amount)*Math.min(Math.abs(amount),this.points[index],100-this.points[index]);
+  }
+  move(index,value) {const [min,max]=this.bounds(index); this.points[index]=Math.max(min,Math.min(max,value)); this.paint();}
+  reset() {this.points = this.images.length===3 ? [33.33,66.67] : [50]; this.paint();}
+  paint() {
+    const top = [0,...this.points.map((p,i)=>p+this.offset(i)),100];
+    const bottom = [0,...this.points.map((p,i)=>p-this.offset(i)),100];
+    const edges = bottom;
+    this.layers.forEach((layer,i) => {layer.style.clipPath=`polygon(${top[i]}% 0, ${top[i+1]}% 0, ${bottom[i+1]}% 100%, ${bottom[i]}% 100%)`;});
+    this.labels.forEach((label,i) => {label.style.left=`${(edges[i]+edges[i+1])/2}%`; label.style.maxWidth=`calc(${edges[i+1]-edges[i]}% - 12px)`; label.style.visibility=edges[i+1]-edges[i]<9 ? 'hidden' : 'visible';});
+    this.handles.forEach((handle,i) => {
+      handle.style.left=`${this.points[i]}%`;
+      const box=this.getBoundingClientRect();
+      const skew=box.height ? Math.atan(-2*this.offset(i)/100*box.width/box.height)*180/Math.PI : 0;
+      handle.style.transform=`translateX(-50%) skewX(${skew}deg)`;
+      handle.querySelector('.grip').style.transform=`translate(-50%,-50%) skewX(${-skew}deg)`;
+      const [min,max]=this.bounds(i);
+      handle.setAttribute('aria-valuemin',min.toFixed(2)); handle.setAttribute('aria-valuemax',max.toFixed(2));
+      handle.setAttribute('aria-valuenow',this.points[i].toFixed(2)); handle.setAttribute('aria-valuetext',`${Math.round(this.points[i])}% from the left`);
+    });
+  }
+  disconnectedCallback() {this.controller?.abort(); this.resizeObserver?.disconnect();}
+}
+customElements.define('image-compare',ImageCompare);
+
+
+const configs={"stath": {"title": "Stath", "aspectRatio": "16 / 9", "dividerAngle": 15, "images": [{"src": "https://gentlemendirectors.github.io/Slider/01-stath-and-slider-code/stath/images/Stath_Day_00000.webp", "label": "Day", "alt": "Stath scene \u2014 Day variation"}, {"src": "https://gentlemendirectors.github.io/Slider/01-stath-and-slider-code/stath/images/Stath_Night_00000.webp", "label": "Night", "alt": "Stath scene \u2014 Night variation"}]}, "center": {"title": "Center", "aspectRatio": "16 / 9", "dividerAngle": 15, "images": [{"src": "https://gentlemendirectors.github.io/Slider/02-center/center/images/Stath_Center_Day_2_00000.webp", "label": "Business", "alt": "Center scene \u2014 Business variation"}, {"src": "https://gentlemendirectors.github.io/Slider/02-center/center/images/Stath_Center_Night_2_00000.webp", "label": "Pleasure", "alt": "Center scene \u2014 Pleasure variation"}]}, "aquarium": {"title": "Aquarium", "aspectRatio": "16 / 7", "dividerAngle": 15, "images": [{"src": "https://gentlemendirectors.github.io/Slider/03-aquarium/image-compare/images/AQ1.webp", "label": "Cool", "alt": "Aquarium scene \u2014 Cool variation"}, {"src": "https://gentlemendirectors.github.io/Slider/03-aquarium/image-compare/images/AQ2.webp", "label": "Golden", "alt": "Aquarium scene \u2014 Golden variation"}, {"src": "https://gentlemendirectors.github.io/Slider/03-aquarium/image-compare/images/AQ3.webp", "label": "Night", "alt": "Aquarium scene \u2014 Night variation"}]}, "bathroom": {"title": "Bathroom", "aspectRatio": "16 / 9", "dividerAngle": 15, "images": [{"src": "https://gentlemendirectors.github.io/Slider/04-bathroom-and-homepage/bathroom/images/Bathroom1.webp", "label": "Haunted", "alt": "Bathroom scene \u2014 Haunted variation"}, {"src": "https://gentlemendirectors.github.io/Slider/04-bathroom-and-homepage/bathroom/images/Bathroom2.webp", "label": "Damned", "alt": "Bathroom scene \u2014 Damned variation"}, {"src": "https://gentlemendirectors.github.io/Slider/04-bathroom-and-homepage/bathroom/images/Bathroom3.webp", "label": "Infested", "alt": "Bathroom scene \u2014 Infested variation"}]}};
+const key=new URLSearchParams(location.search).get('scene');
+if(key && configs[key]) {
+  document.body.className='embed';
+  document.title=configs[key].title+' lighting comparison';
+  const viewer=document.createElement('image-compare');
+  document.body.append(viewer); viewer.configure(configs[key]);
+} else {
+  const main=document.createElement('main');
+  main.innerHTML='<p class="eyebrow">LIGHTSWITCH / LIGHTING STUDIES</p><h1>One scene. Every possibility.</h1><p class="intro" style="margin-top:20px">Drag the angled dividers to explore each lighting setup.</p>';
+  for(const [id,config] of Object.entries(configs)) {
+    const section=document.createElement('section'); section.style.margin='40px 0 60px';
+    const heading=document.createElement('h2'); heading.textContent=config.title;
+    const labels=document.createElement('p'); labels.textContent=config.images.map(i=>i.label).join(' → ');
+    const frame=document.createElement('iframe'); frame.src='?scene='+id; frame.title=config.title+' lighting comparison'; frame.loading='lazy'; frame.style.cssText='display:block;width:100%;border:0;border-radius:16px;aspect-ratio:'+config.aspectRatio;
+    const link=document.createElement('a'); link.href='?scene='+id; link.textContent='Open slider ↗'; link.style.cssText='display:inline-block;margin-top:14px;font-size:13px';
+    section.append(heading,labels,frame,link); main.append(section);
+  }
+  document.body.append(main);
+}
+</script></body></html>
